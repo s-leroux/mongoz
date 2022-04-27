@@ -1,15 +1,14 @@
-const mongoc = @cImport({
-    @cInclude("mongoc.h");
-});
-
 const std = @import("std");
+const mongo = @import("mongo.zig");
+
 const testing = std.testing;
 
-export fn init() void {
-    mongoc.mongoc_init();
-    mongoc.mongoc_cleanup();
-}
-
 test "init mongo lib" {
-    init();
+    const uri_string = "mongodb://localhost:27017";
+
+    try mongo.init();
+    defer mongo.cleanup();
+
+    var err: mongo.Uri.Error = undefined;
+    _ = try mongo.Uri.new(uri_string, &err);
 }
