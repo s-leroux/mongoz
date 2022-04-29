@@ -17,9 +17,10 @@ pub const Json = struct{
     }
 };
 
-//
-// Bson type
-//
+///
+/// Bson type
+///
+/// A bunch of constant copied from `bson-type.h`
 pub const Type = struct {
     pub const EOD : c_uint = clib.BSON_TYPE_EOD;
     pub const DOUBLE : c_uint = clib.BSON_TYPE_DOUBLE;
@@ -51,12 +52,15 @@ pub const Type = struct {
 pub const Value = struct {
     value: clib.bson_value_t,
 
+    /// Unpack the value and return it as a 32-bit integer
     pub fn asInt32(self: *const Value) BsonError!i32 {
         return (ValuePtr{
           .ptr = &self.value,
         }).asInt32();
     }
 
+
+    /// Unpack the value and return it as a 64-bit integer
     pub fn asInt64(self: *const Value) BsonError!i64 {
         return (ValuePtr{
           .ptr = &self.value,
@@ -82,6 +86,9 @@ pub const ValuePtr = struct{
         };
     }
 
+    /// Unpack the value and return it as a 32-bit integer
+    /// XXX Should we perform integer widening
+    /// (i.e. transparently converting from i8 to i32) ?
     pub fn asInt32(self: *const ValuePtr) BsonError!i32 {
         if (self.ptr.value_type == Type.INT32) {
             return self.ptr.value.v_int32;
@@ -90,6 +97,9 @@ pub const ValuePtr = struct{
         return BsonError.typeError;
     }
 
+    /// Unpack the value and return it as a 64-bit integer
+    /// XXX Should we perform integer widening
+    /// (i.e. transparently converting from i32 to i64) ?
     pub fn asInt64(self: *const ValuePtr) BsonError!i64 {
         if (self.ptr.value_type == Type.INT64) {
             return self.ptr.value.v_int64;
@@ -116,6 +126,9 @@ pub const Iter = struct{
     ///
     /// Return the value currently pointed by the iterator.
     /// The value is invalided if the iterator is modified.
+    ///
+    /// If you need to keep the value, call `.copy()` to
+    /// make a copy. The copy needs to be freed by calling `.destroy()`
     pub fn value(self: *Iter) ValuePtr {
         return ValuePtr{
             .ptr = clib.bson_iter_value(&self.it),
