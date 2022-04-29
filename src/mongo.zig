@@ -29,7 +29,7 @@ const MongoError = error{
 // Collection
 //
 pub const Collection = struct {
-    collection: *clib.mongoc_collection_t,
+    ptr: *clib.mongoc_collection_t,
 };
 
 //
@@ -42,7 +42,7 @@ fn client_new_from_uri_with_error_stub(uri: ?*clib.mongoc_uri_t, err: ?*clib.bso
 
 
 pub const Client = struct {
-    client: *clib.mongoc_client_t,
+    ptr: *clib.mongoc_client_t,
 
     pub fn new(uri: Uri, err: *Error) !Client {
         const client_new_from_uri_with_error_ptr = if (@hasDecl(clib, "mongoc_client_new_from_uri_with_error"))
@@ -50,10 +50,10 @@ pub const Client = struct {
         else
             client_new_from_uri_with_error_stub;
 
-        const client = client_new_from_uri_with_error_ptr(uri.uri, err);
+        const client = client_new_from_uri_with_error_ptr(uri.ptr, err);
         if (client) |c| {
             return Client{
-                .client = c,
+                .ptr = c,
             };
         }
 
@@ -61,14 +61,14 @@ pub const Client = struct {
     }
 
     pub fn setAppname(self: *const Client, appname: [:0]const u8) MongoError!void {
-        if (!clib.mongoc_client_set_appname(self.client, appname))
+        if (!clib.mongoc_client_set_appname(self.ptr, appname))
           return MongoError.ClientError;
     }
 
     pub fn getCollection(self: *const Client, db: [:0]const u8, collection: [:0]const u8) MongoError!Collection {
-        if (clib.mongoc_client_get_collection(self.client, db, collection)) |c| {
+        if (clib.mongoc_client_get_collection(self.ptr, db, collection)) |c| {
             return Collection{
-              .collection = c,
+              .ptr = c,
             };
         }
 
@@ -81,7 +81,7 @@ pub const Client = struct {
                         read_prefs: ?*clib.mongoc_read_prefs_t,
                         reply: bson.Bson,
                         err: ?*Error) MongoError!void {
-        const success = clib.mongoc_client_command_simple(self.client, db, command.bson, read_prefs, reply.bson, err);
+        const success = clib.mongoc_client_command_simple(self.ptr, db, command.ptr, read_prefs, reply.ptr, err);
         errdefer reply.destroy();
 
         if (success) {
@@ -96,15 +96,15 @@ pub const Client = struct {
 // Uri
 //
 pub const Uri = struct {
-    uri : ?*clib.mongoc_uri_t,
+    ptr : ?*clib.mongoc_uri_t,
 
 
     pub fn new(uri_string: [:0]const u8, err: *Error) !Uri {
         const result = Uri {
-            .uri = clib.mongoc_uri_new_with_error (uri_string, err),
+            .ptr = clib.mongoc_uri_new_with_error (uri_string, err),
         };
 
-        if (result.uri != null) {
+        if (result.ptr != null) {
           return result;
         }
 
