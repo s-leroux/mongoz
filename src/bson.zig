@@ -4,6 +4,9 @@ pub const BsonError = error{
     bsonError,
 };
 
+//
+// Json
+//
 pub const Json = struct{
     ptr: [*:0]u8,
 
@@ -12,6 +15,25 @@ pub const Json = struct{
     }
 };
 
+//
+// Bson iterator
+//
+pub const Iter = struct{
+    it: clib.bson_iter_t,
+
+    pub fn next(self: *Iter) bool {
+        return clib.bson_iter_next(&self.it);
+    }
+
+    pub fn key(self: *Iter) [*:0]const u8 {
+        return clib.bson_iter_key(&self.it);
+    }
+
+};
+
+//
+// Bson
+//
 pub const Bson = struct{
     ptr: *clib.bson_t,
 
@@ -43,6 +65,18 @@ pub const Bson = struct{
 
     pub fn hasField(self: *const Bson, key: [:0]const u8) bool {
         return clib.bson_has_field(self.ptr, key);
+    }
+
+    pub fn iter(self: *const Bson) BsonError!Iter {
+        var it: clib.bson_iter_t = undefined;
+
+        if (clib.bson_iter_init(&it, self.ptr)) {
+            return Iter{
+              .it = it,
+            };
+        }
+
+        return BsonError.bsonError;
     }
 };
 

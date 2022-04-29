@@ -51,3 +51,25 @@ test "bson append int32" {
 
     try testing.expectEqualStrings("{ \"the_key\" : { \"$numberInt\" : \"42\" } }", std.mem.sliceTo(json.ptr,0));
 }
+
+test "bson iter" {
+    const document = try bson.new();
+    defer document.destroy();
+
+    try document.appendInt32("a",42);
+    try document.appendInt32("bb",43);
+
+
+    var keys = [_]([*:0]const u8){ "" } ** 5;
+    var idx:usize = 0;
+
+    var iter = try document.iter();
+    while(iter.next()) {
+        keys[idx] = iter.key();
+        idx += 1;
+    }
+
+    try testing.expectEqual(idx, 2);
+    try testing.expectEqualStrings("a", std.mem.sliceTo(keys[0], 0));
+    try testing.expectEqualStrings("bb", std.mem.sliceTo(keys[1], 0));
+}
