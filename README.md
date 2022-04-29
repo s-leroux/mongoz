@@ -10,7 +10,8 @@ apt-get install libmongoc-1.0-0 libmongoc-dev
 zig build test
 ```
 
-The tests assume you have a clean MongoDB instance listening on 127.0.0.1:27017
+The tests are in the `src/main.zig` source file.
+They assume you have a clean MongoDB instance listening on 127.0.0.1:27017
 and accessible with the mongoadmin/mongopass credentials.
 
 The easiest way to achieve that is starting a MongoDB Docker container as shown
