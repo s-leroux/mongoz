@@ -1,7 +1,4 @@
-const bsonc = @cImport({
-    @cInclude("bson.h");
-});
-
+const clib = @import("clib.zig");
 pub const BsonError = error{
     bsonError,
 };
@@ -10,26 +7,31 @@ pub const Json = struct{
     ptr: [*:0]u8,
 
     pub fn free(self: *const Json) void {
-        bsonc.bson_free(self.ptr);
+        clib.bson_free(self.ptr);
     }
 };
 
 pub const Bson = struct{
-    bson: *bsonc.bson_t,
+    bson: *clib.bson_t,
 
     pub fn destroy(self: *const Bson) void {
-        bsonc.bson_destroy(self.bson);
+        clib.bson_destroy(self.bson);
     }
 
     pub fn appendUtf8(self: *const Bson, key: [:0]const u8, value: [:0]const u8) !void {
-        if (!bsonc.bson_append_utf8(self.bson, key, -1, value, -1))
+        if (!clib.bson_append_utf8(self.bson, key, -1, value, -1))
+            return BsonError.bsonError;
+    }
+
+    pub fn appendInt32(self: *const Bson, key: [:0]const u8, value: i32) !void {
+        if (!clib.bson_append_int32(self.bson, key, -1, value))
             return BsonError.bsonError;
     }
 
     pub fn asCanonicalExtendedJson(self: *const Bson) !Json {
         var l: usize = undefined;
 
-        if (bsonc.bson_as_canonical_extended_json(self.bson, &l)) |json| {
+        if (clib.bson_as_canonical_extended_json(self.bson, &l)) |json| {
             return Json{
                 .ptr = json,
             };
@@ -37,10 +39,14 @@ pub const Bson = struct{
 
         return BsonError.bsonError;
     }
+
+    pub fn hasField(self: *const Bson, key: [:0]const u8) bool {
+        return clib.bson_has_field(self.bson, key);
+    }
 };
 
 pub fn new() !Bson {
-    if (bsonc.bson_new()) |b| {
+    if (clib.bson_new()) |b| {
         return Bson{
           .bson = b,
         };

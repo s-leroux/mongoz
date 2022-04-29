@@ -1,25 +1,24 @@
-const mongoc = @cImport({
-    @cInclude("mongoc.h");
-});
-
 const std = @import("std");
+const clib = @import("clib.zig");
+
+const bson = @import("bson.zig");
 
 //
 // Library init & cleanup
 //
 pub fn init() !void {
-    mongoc.mongoc_init(); // Can this fail? How to detect that?
-                          // see http://mongoc.org/libmongoc/current/mongoc_init.html
+    clib.mongoc_init(); // Can this fail? How to detect that?
+                          // see http://clib.org/libmongoc/current/mongoc_init.html
 }
 
 pub fn cleanup() void {
-    mongoc.mongoc_cleanup();
+    clib.mongoc_cleanup();
 }
 
 //
 // Errors
 //
-pub const Error = mongoc.bson_error_t;
+pub const Error = clib.bson_error_t;
 
 const MongoError = error{
     ClientError,
@@ -30,24 +29,24 @@ const MongoError = error{
 // Collection
 //
 pub const Collection = struct {
-    collection: *mongoc.mongoc_collection_t,
+    collection: *clib.mongoc_collection_t,
 };
 
 //
 // Client
 //
-fn client_new_from_uri_with_error_stub(uri: ?*mongoc.mongoc_uri_t, err: ?*mongoc.bson_error_t) ?*mongoc.mongoc_client_t {
+fn client_new_from_uri_with_error_stub(uri: ?*clib.mongoc_uri_t, err: ?*clib.bson_error_t) ?*clib.mongoc_client_t {
     _ = err;
-    return mongoc.mongoc_client_new_from_uri(uri);
+    return clib.mongoc_client_new_from_uri(uri);
 }
 
 
 pub const Client = struct {
-    client: *mongoc.mongoc_client_t,
+    client: *clib.mongoc_client_t,
 
     pub fn new(uri: Uri, err: *Error) !Client {
-        const client_new_from_uri_with_error_ptr = if (@hasDecl(mongoc, "mongoc_client_new_from_uri_with_error"))
-            mongoc.mongoc_client_new_from_uri_with_error
+        const client_new_from_uri_with_error_ptr = if (@hasDecl(clib, "mongoc_client_new_from_uri_with_error"))
+            clib.mongoc_client_new_from_uri_with_error
         else
             client_new_from_uri_with_error_stub;
 
@@ -62,12 +61,12 @@ pub const Client = struct {
     }
 
     pub fn setAppname(self: *const Client, appname: [:0]const u8) MongoError!void {
-        if (!mongoc.mongoc_client_set_appname(self.client, appname))
+        if (!clib.mongoc_client_set_appname(self.client, appname))
           return MongoError.ClientError;
     }
 
     pub fn getCollection(self: *const Client, db: [:0]const u8, collection: [:0]const u8) MongoError!Collection {
-        if (mongoc.mongoc_client_get_collection(self.client, db, collection)) |c| {
+        if (clib.mongoc_client_get_collection(self.client, db, collection)) |c| {
             return Collection{
               .collection = c,
             };
@@ -75,18 +74,34 @@ pub const Client = struct {
 
         return error.ClientError;
     }
+
+    pub fn commandSimple(self: *const Client,
+                        db: [:0]const u8,
+                        command: bson.Bson,
+                        read_prefs: ?*clib.mongoc_read_prefs_t,
+                        reply: bson.Bson,
+                        err: ?*Error) MongoError!void {
+        const success = clib.mongoc_client_command_simple(self.client, db, command.bson, read_prefs, reply.bson, err);
+        errdefer reply.destroy();
+
+        if (success) {
+            return;
+        }
+
+        return MongoError.ClientError;
+    }
 };
 
 //
 // Uri
 //
 pub const Uri = struct {
-    uri : ?*mongoc.mongoc_uri_t,
+    uri : ?*clib.mongoc_uri_t,
 
 
     pub fn new(uri_string: [:0]const u8, err: *Error) !Uri {
         const result = Uri {
-            .uri = mongoc.mongoc_uri_new_with_error (uri_string, err),
+            .uri = clib.mongoc_uri_new_with_error (uri_string, err),
         };
 
         if (result.uri != null) {

@@ -5,7 +5,7 @@ const mongo = @import("mongo.zig");
 const testing = std.testing;
 
 test "init mongo lib" {
-    const uri_string = "mongodb://localhost:27018";
+    const uri_string = "mongodb://localhost:27017";
 
     try mongo.init();
     defer mongo.cleanup();
@@ -15,17 +15,20 @@ test "init mongo lib" {
     const client = try mongo.Client.new(uri, &err);
 
     try client.setAppname("my-app");
-    _ = try client.getCollection("db","coll");
+    //const collection = try client.getCollection("db","coll");
+    const command = try bson.new();
+    defer command.destroy();
+
+    try command.appendInt32("ping", 1);
+
+    const reply = try bson.new();
+    defer reply.destroy();
+
+    try client.commandSimple("admin", command, null, reply, &err);
+    try testing.expect(reply.hasField("ok"));
 }
 
-test "bson" {
-    const document = try bson.new();
-    defer document.destroy();
-
-    try document.appendUtf8("k","v");
-}
-
-test "bson to json" {
+test "bson append utf8" {
     const document = try bson.new();
     defer document.destroy();
 
@@ -35,4 +38,16 @@ test "bson to json" {
     defer json.free();
 
     try testing.expectEqualStrings("{ \"the_key\" : \"the_value\" }", std.mem.sliceTo(json.ptr,0));
+}
+
+test "bson append int32" {
+    const document = try bson.new();
+    defer document.destroy();
+
+    try document.appendInt32("the_key",42);
+
+    const json = try document.asCanonicalExtendedJson();
+    defer json.free();
+
+    try testing.expectEqualStrings("{ \"the_key\" : { \"$numberInt\" : \"42\" } }", std.mem.sliceTo(json.ptr,0));
 }
