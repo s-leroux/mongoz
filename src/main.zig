@@ -58,6 +58,7 @@ test "bson iter" {
 
     try document.appendInt32("a",42);
     try document.appendInt64("bb",43);
+    try document.appendUtf8("ccc","value");
 
 
     const MAX_LEN = 5;
@@ -78,11 +79,17 @@ test "bson iter" {
         value.destroy();
     };
 
-    try testing.expectEqual(idx, 2);
+    try testing.expectEqual(idx, 3);
+
     try testing.expectEqualStrings("a", std.mem.sliceTo(keys[0], 0));
     try testing.expectEqual(bson.Type.INT32, values[0].value.value_type);
     try testing.expectEqual(@as(i32,42), try values[0].asInt32());
+
     try testing.expectEqualStrings("bb", std.mem.sliceTo(keys[1], 0));
     try testing.expectEqual(bson.Type.INT64, values[1].value.value_type);
     try testing.expectEqual(@as(i64,43), try values[1].asInt64());
+
+    try testing.expectEqualStrings("ccc", std.mem.sliceTo(keys[2], 0));
+    try testing.expectEqual(bson.Type.UTF8, values[2].value.value_type);
+    try testing.expectEqualStrings("value", try values[2].asUtf8());
 }

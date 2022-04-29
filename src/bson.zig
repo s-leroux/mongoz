@@ -67,6 +67,13 @@ pub const Value = struct {
         }).asInt64();
     }
 
+    /// Unpack the value and return it as a UTF8 slice
+    pub fn asUtf8(self: *const Value) BsonError![]u8 {
+        return (ValuePtr{
+          .ptr = &self.value,
+        }).asUtf8();
+    }
+
     pub fn destroy(self: *Value) void {
         clib.bson_value_destroy(&self.value);
     }
@@ -103,6 +110,16 @@ pub const ValuePtr = struct{
     pub fn asInt64(self: *const ValuePtr) BsonError!i64 {
         if (self.ptr.value_type == Type.INT64) {
             return self.ptr.value.v_int64;
+        }
+
+        return BsonError.typeError;
+    }
+
+    /// Unpack the value and return it as an UTF-8 string.
+    /// The string is *not* null-terminated.
+    pub fn asUtf8(self: *const ValuePtr) BsonError![]u8 {
+        if (self.ptr.value_type == Type.UTF8) {
+            return self.ptr.value.v_utf8.str[0..self.ptr.value.v_utf8.len];
         }
 
         return BsonError.typeError;
