@@ -57,19 +57,32 @@ test "bson iter" {
     defer document.destroy();
 
     try document.appendInt32("a",42);
-    try document.appendInt32("bb",43);
+    try document.appendInt64("bb",43);
 
 
-    var keys = [_]([*:0]const u8){ "" } ** 5;
+    const MAX_LEN = 5;
+    var keys = [_]([*:0]const u8){ "" } ** MAX_LEN;
+    var values = [_]bson.Value{ .{
+        .value = undefined,
+    }} ** MAX_LEN;
+
     var idx:usize = 0;
 
     var iter = try document.iter();
     while(iter.next()) {
         keys[idx] = iter.key();
+        values[idx] = iter.value().copy();
         idx += 1;
     }
+    defer for(values[0..idx]) |*value| {
+        value.destroy();
+    };
 
     try testing.expectEqual(idx, 2);
     try testing.expectEqualStrings("a", std.mem.sliceTo(keys[0], 0));
+    try testing.expectEqual(bson.Type.INT32, values[0].value.value_type);
+    try testing.expectEqual(@as(i32,42), try values[0].asInt32());
     try testing.expectEqualStrings("bb", std.mem.sliceTo(keys[1], 0));
+    try testing.expectEqual(bson.Type.INT64, values[1].value.value_type);
+    try testing.expectEqual(@as(i64,43), try values[1].asInt64());
 }
