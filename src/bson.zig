@@ -157,6 +157,57 @@ pub const Iter = struct{
 //
 // Bson
 //
+fn bsonInit(bson: *clib.bson_t) void {
+    clib.bson_init(bson);
+}
+
+fn bsonDestroy(bson: *clib.bson_t) void {
+    clib.bson_destroy(bson);
+}
+
+fn bsonAppendUtf8(bson: *clib.bson_t, key: [:0]const u8, value: [:0]const u8) !void {
+    if (!clib.bson_append_utf8(bson, key, -1, value, -1))
+        return BsonError.bsonError;
+}
+
+fn bsonAppendInt32(bson: *clib.bson_t, key: [:0]const u8, value: i32) !void {
+    if (!clib.bson_append_int32(bson, key, -1, value))
+        return BsonError.bsonError;
+}
+
+fn bsonAppendInt64(bson: *clib.bson_t, key: [:0]const u8, value: i64) !void {
+    if (!clib.bson_append_int64(bson, key, -1, value))
+        return BsonError.bsonError;
+}
+
+fn bsonAsCanonicalExtendedJson(bson: *const clib.bson_t) !Json {
+    var l: usize = undefined;
+
+    if (clib.bson_as_canonical_extended_json(bson, &l)) |json| {
+        return Json{
+            .ptr = json,
+        };
+    }
+
+    return BsonError.bsonError;
+}
+
+fn bsonHasField(bson: *const clib.bson_t, key: [:0]const u8) bool {
+    return clib.bson_has_field(bson, key);
+}
+
+fn bsonIter(bson: *const clib.bson_t) BsonError!Iter {
+    var it: clib.bson_iter_t = undefined;
+
+    if (clib.bson_iter_init(&it, bson)) {
+        return Iter{
+          .it = it,
+        };
+    }
+
+    return BsonError.bsonError;
+}
+
 pub const Bson = struct{
     value: clib.bson_t,
 
@@ -165,54 +216,35 @@ pub const Bson = struct{
     ///
     /// The document must be released by calling `.destroy()`
     pub fn init(self: *Bson) void {
-        clib.bson_init(&self.value);
+        return bsonInit(&self.value);
     }
 
     pub fn destroy(self: *Bson) void {
-        clib.bson_destroy(&self.value);
+        return bsonDestroy(&self.value);
     }
 
     pub fn appendUtf8(self: *Bson, key: [:0]const u8, value: [:0]const u8) !void {
-        if (!clib.bson_append_utf8(&self.value, key, -1, value, -1))
-            return BsonError.bsonError;
+        return bsonAppendUtf8(&self.value, key, value);
     }
 
     pub fn appendInt32(self: *Bson, key: [:0]const u8, value: i32) !void {
-        if (!clib.bson_append_int32(&self.value, key, -1, value))
-            return BsonError.bsonError;
+        return bsonAppendInt32(&self.value, key, value);
     }
 
     pub fn appendInt64(self: *Bson, key: [:0]const u8, value: i64) !void {
-        if (!clib.bson_append_int64(&self.value, key, -1, value))
-            return BsonError.bsonError;
+        return bsonAppendInt64(&self.value, key, value);
     }
 
     pub fn asCanonicalExtendedJson(self: *const Bson) !Json {
-        var l: usize = undefined;
-
-        if (clib.bson_as_canonical_extended_json(&self.value, &l)) |json| {
-            return Json{
-                .ptr = json,
-            };
-        }
-
-        return BsonError.bsonError;
+        return bsonAsCanonicalExtendedJson(&self.value);
     }
 
     pub fn hasField(self: *const Bson, key: [:0]const u8) bool {
-        return clib.bson_has_field(&self.value, key);
+        return bsonHasField(&self.value, key);
     }
 
     pub fn iter(self: *const Bson) BsonError!Iter {
-        var it: clib.bson_iter_t = undefined;
-
-        if (clib.bson_iter_init(&it, &self.value)) {
-            return Iter{
-              .it = it,
-            };
-        }
-
-        return BsonError.bsonError;
+        return bsonIter(&self.value);
     }
 };
 
