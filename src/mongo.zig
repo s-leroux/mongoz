@@ -77,11 +77,11 @@ pub const Client = struct {
 
     pub fn commandSimple(self: *const Client,
                         db: [:0]const u8,
-                        command: bson.Bson,
+                        command: *bson.Bson,
                         read_prefs: ?*clib.mongoc_read_prefs_t,
-                        reply: bson.Bson,
+                        reply: *bson.Bson,
                         err: ?*Error) MongoError!void {
-        const success = clib.mongoc_client_command_simple(self.ptr, db, command.ptr, read_prefs, reply.ptr, err);
+        const success = clib.mongoc_client_command_simple(self.ptr, db, &command.value, read_prefs, &reply.value, err);
         errdefer reply.destroy();
 
         if (success) {

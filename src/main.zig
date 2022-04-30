@@ -16,20 +16,23 @@ test "init mongo lib" {
 
     try client.setAppname("my-app");
     //const collection = try client.getCollection("db","coll");
-    const command = try bson.new();
+    var command: bson.Bson = undefined;
+    command.init();
     defer command.destroy();
 
     try command.appendInt32("ping", 1);
 
-    const reply = try bson.new();
+    var reply: bson.Bson = undefined;
+    reply.init();
     defer reply.destroy();
 
-    try client.commandSimple("admin", command, null, reply, &err);
+    try client.commandSimple("admin", &command, null, &reply, &err);
     try testing.expect(reply.hasField("ok"));
 }
 
 test "bson append utf8" {
-    const document = try bson.new();
+    var document: bson.Bson = undefined;
+    document.init();
     defer document.destroy();
 
     try document.appendUtf8("the_key","the_value");
@@ -41,7 +44,8 @@ test "bson append utf8" {
 }
 
 test "bson append int32" {
-    const document = try bson.new();
+    var document: bson.Bson = undefined;
+    document.init();
     defer document.destroy();
 
     try document.appendInt32("the_key",42);
@@ -53,7 +57,8 @@ test "bson append int32" {
 }
 
 test "bson iter" {
-    const document = try bson.new();
+    var document: bson.Bson = undefined;
+    document.init();
     defer document.destroy();
 
     try document.appendInt32("a",42);

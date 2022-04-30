@@ -158,31 +158,39 @@ pub const Iter = struct{
 // Bson
 //
 pub const Bson = struct{
-    ptr: *clib.bson_t,
+    value: clib.bson_t,
 
-    pub fn destroy(self: *const Bson) void {
-        clib.bson_destroy(self.ptr);
+    ///
+    /// Initialize a Bson document
+    ///
+    /// The document must be released by calling `.destroy()`
+    pub fn init(self: *Bson) void {
+        clib.bson_init(&self.value);
     }
 
-    pub fn appendUtf8(self: *const Bson, key: [:0]const u8, value: [:0]const u8) !void {
-        if (!clib.bson_append_utf8(self.ptr, key, -1, value, -1))
+    pub fn destroy(self: *Bson) void {
+        clib.bson_destroy(&self.value);
+    }
+
+    pub fn appendUtf8(self: *Bson, key: [:0]const u8, value: [:0]const u8) !void {
+        if (!clib.bson_append_utf8(&self.value, key, -1, value, -1))
             return BsonError.bsonError;
     }
 
-    pub fn appendInt32(self: *const Bson, key: [:0]const u8, value: i32) !void {
-        if (!clib.bson_append_int32(self.ptr, key, -1, value))
+    pub fn appendInt32(self: *Bson, key: [:0]const u8, value: i32) !void {
+        if (!clib.bson_append_int32(&self.value, key, -1, value))
             return BsonError.bsonError;
     }
 
-    pub fn appendInt64(self: *const Bson, key: [:0]const u8, value: i64) !void {
-        if (!clib.bson_append_int64(self.ptr, key, -1, value))
+    pub fn appendInt64(self: *Bson, key: [:0]const u8, value: i64) !void {
+        if (!clib.bson_append_int64(&self.value, key, -1, value))
             return BsonError.bsonError;
     }
 
     pub fn asCanonicalExtendedJson(self: *const Bson) !Json {
         var l: usize = undefined;
 
-        if (clib.bson_as_canonical_extended_json(self.ptr, &l)) |json| {
+        if (clib.bson_as_canonical_extended_json(&self.value, &l)) |json| {
             return Json{
                 .ptr = json,
             };
@@ -192,13 +200,13 @@ pub const Bson = struct{
     }
 
     pub fn hasField(self: *const Bson, key: [:0]const u8) bool {
-        return clib.bson_has_field(self.ptr, key);
+        return clib.bson_has_field(&self.value, key);
     }
 
     pub fn iter(self: *const Bson) BsonError!Iter {
         var it: clib.bson_iter_t = undefined;
 
-        if (clib.bson_iter_init(&it, self.ptr)) {
+        if (clib.bson_iter_init(&it, &self.value)) {
             return Iter{
               .it = it,
             };
@@ -208,12 +216,26 @@ pub const Bson = struct{
     }
 };
 
-pub fn new() !Bson {
-    if (clib.bson_new()) |b| {
-        return Bson{
-          .ptr = b,
-        };
-    }
+///
+/// Initialize a Bson document
+///
+/// The document must be released by calling `.destroy()`
+pub fn init() Bson {
+    var document: clib.bson_t = undefined;
 
-    return BsonError.allocError;
+    clib.bson_init(&document);
+    return Bson {
+        .value = document,
+    };
 }
+
+//
+// pub fn new() !Bson {
+//     if (clib.bson_new()) |b| {
+//         return Bson{
+//           .ptr = b,
+//         };
+//     }
+//
+//     return BsonError.allocError;
+// }
