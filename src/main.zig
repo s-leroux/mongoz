@@ -43,6 +43,18 @@ test "bson append utf8" {
     try testing.expectEqualStrings("{ \"the_key\" : \"the_value\" }", std.mem.sliceTo(json.ptr,0));
 }
 
+test "bson ptr append utf8" {
+    var document = try bson.BsonPtr.new();
+    defer document.destroy();
+
+    try document.appendUtf8("the_key","the_value");
+
+    const json = try document.asCanonicalExtendedJson();
+    defer json.free();
+
+    try testing.expectEqualStrings("{ \"the_key\" : \"the_value\" }", std.mem.sliceTo(json.ptr,0));
+}
+
 test "bson append int32" {
     var document: bson.Bson = undefined;
     document.init();
