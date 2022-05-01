@@ -157,6 +157,11 @@ pub const Iter = struct{
 //
 // Bson
 //
+
+//
+// Raw functions.
+// Wrappers around the clib implementation.
+//
 fn bsonInit(bson: *clib.bson_t) void {
     clib.bson_init(bson);
 }
@@ -218,10 +223,17 @@ fn bsonIter(bson: *const clib.bson_t) BsonError!Iter {
     return BsonError.bsonError;
 }
 
-fn BsonT(comptime is_ptr: bool) type {
+fn BsonT(comptime T: type) type {
     return struct {
+        //
+        // A little bit of Zig magic to make the namespaced functions
+        // usable both with a bson_t and *bson_t
+        //
         const S = @This();
-        const T = if (is_ptr) *clib.bson_t else clib.bson_t;
+        const is_ptr = switch(@typeInfo(T)) {
+            .Pointer => true,
+            else => false,
+        };
 
         value: T,
         fn get(self: *@This()) *clib.bson_t { return if (is_ptr) self.value else &self.value; }
@@ -242,6 +254,11 @@ fn BsonT(comptime is_ptr: bool) type {
             }
         };
 
+
+        //
+        // Nmespaced functions. Forward to their raw counterparts.
+        // Hopefully this is inlined by the compiler.
+        //
         pub fn destroy(self: *S) void {
             return bsonDestroy(self.get());
         }
@@ -272,8 +289,8 @@ fn BsonT(comptime is_ptr: bool) type {
     };
 }
 
-pub const Bson = BsonT(false);
-pub const BsonPtr = BsonT(true);
+pub const Bson = BsonT(clib.bson_t);
+pub const BsonPtr = BsonT(*clib.bson_t);
 
 //
 // }
