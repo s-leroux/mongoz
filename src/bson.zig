@@ -17,9 +17,10 @@ pub const Json = struct{
     }
 };
 
-//
-// Bson type
-//
+///
+/// Bson type
+///
+/// A bunch of constant copied from `bson-type.h`
 pub const Type = struct {
     pub const EOD : c_uint = clib.BSON_TYPE_EOD;
     pub const DOUBLE : c_uint = clib.BSON_TYPE_DOUBLE;
@@ -51,16 +52,26 @@ pub const Type = struct {
 pub const Value = struct {
     value: clib.bson_value_t,
 
+    /// Unpack the value and return it as a 32-bit integer
     pub fn asInt32(self: *const Value) BsonError!i32 {
         return (ValuePtr{
           .ptr = &self.value,
         }).asInt32();
     }
 
+
+    /// Unpack the value and return it as a 64-bit integer
     pub fn asInt64(self: *const Value) BsonError!i64 {
         return (ValuePtr{
           .ptr = &self.value,
         }).asInt64();
+    }
+
+    /// Unpack the value and return it as a UTF8 slice
+    pub fn asUtf8(self: *const Value) BsonError![]u8 {
+        return (ValuePtr{
+          .ptr = &self.value,
+        }).asUtf8();
     }
 
     pub fn destroy(self: *Value) void {
@@ -82,6 +93,9 @@ pub const ValuePtr = struct{
         };
     }
 
+    /// Unpack the value and return it as a 32-bit integer
+    /// XXX Should we perform integer widening
+    /// (i.e. transparently converting from i8 to i32) ?
     pub fn asInt32(self: *const ValuePtr) BsonError!i32 {
         if (self.ptr.value_type == Type.INT32) {
             return self.ptr.value.v_int32;
@@ -90,9 +104,22 @@ pub const ValuePtr = struct{
         return BsonError.typeError;
     }
 
+    /// Unpack the value and return it as a 64-bit integer
+    /// XXX Should we perform integer widening
+    /// (i.e. transparently converting from i32 to i64) ?
     pub fn asInt64(self: *const ValuePtr) BsonError!i64 {
         if (self.ptr.value_type == Type.INT64) {
             return self.ptr.value.v_int64;
+        }
+
+        return BsonError.typeError;
+    }
+
+    /// Unpack the value and return it as an UTF-8 string.
+    /// The string is *not* null-terminated.
+    pub fn asUtf8(self: *const ValuePtr) BsonError![]u8 {
+        if (self.ptr.value_type == Type.UTF8) {
+            return self.ptr.value.v_utf8.str[0..self.ptr.value.v_utf8.len];
         }
 
         return BsonError.typeError;
@@ -116,6 +143,9 @@ pub const Iter = struct{
     ///
     /// Return the value currently pointed by the iterator.
     /// The value is invalided if the iterator is modified.
+    ///
+    /// If you need to keep the value, call `.copy()` to
+    /// make a copy. The copy needs to be freed by calling `.destroy()`
     pub fn value(self: *Iter) ValuePtr {
         return ValuePtr{
             .ptr = clib.bson_iter_value(&self.it),
@@ -127,63 +157,140 @@ pub const Iter = struct{
 //
 // Bson
 //
-pub const Bson = struct{
-    ptr: *clib.bson_t,
 
-    pub fn destroy(self: *const Bson) void {
-        clib.bson_destroy(self.ptr);
-    }
+//
+// Raw functions.
+// Wrappers around the clib implementation.
+//
+fn bsonInit(bson: *clib.bson_t) void {
+    clib.bson_init(bson);
+}
 
-    pub fn appendUtf8(self: *const Bson, key: [:0]const u8, value: [:0]const u8) !void {
-        if (!clib.bson_append_utf8(self.ptr, key, -1, value, -1))
-            return BsonError.bsonError;
-    }
+fn bsonDestroy(bson: *clib.bson_t) void {
+    clib.bson_destroy(bson);
+}
 
-    pub fn appendInt32(self: *const Bson, key: [:0]const u8, value: i32) !void {
-        if (!clib.bson_append_int32(self.ptr, key, -1, value))
-            return BsonError.bsonError;
-    }
-
-    pub fn appendInt64(self: *const Bson, key: [:0]const u8, value: i64) !void {
-        if (!clib.bson_append_int64(self.ptr, key, -1, value))
-            return BsonError.bsonError;
-    }
-
-    pub fn asCanonicalExtendedJson(self: *const Bson) !Json {
-        var l: usize = undefined;
-
-        if (clib.bson_as_canonical_extended_json(self.ptr, &l)) |json| {
-            return Json{
-                .ptr = json,
-            };
-        }
-
-        return BsonError.bsonError;
-    }
-
-    pub fn hasField(self: *const Bson, key: [:0]const u8) bool {
-        return clib.bson_has_field(self.ptr, key);
-    }
-
-    pub fn iter(self: *const Bson) BsonError!Iter {
-        var it: clib.bson_iter_t = undefined;
-
-        if (clib.bson_iter_init(&it, self.ptr)) {
-            return Iter{
-              .it = it,
-            };
-        }
-
-        return BsonError.bsonError;
-    }
-};
-
-pub fn new() !Bson {
+pub fn bsonNew() !BsonPtr {
     if (clib.bson_new()) |b| {
-        return Bson{
-          .ptr = b,
+        return BsonPtr {
+          .value = b,
         };
     }
 
     return BsonError.allocError;
 }
+
+fn bsonAppendUtf8(bson: *clib.bson_t, key: [:0]const u8, value: [:0]const u8) !void {
+    if (!clib.bson_append_utf8(bson, key, -1, value, -1))
+        return BsonError.bsonError;
+}
+
+fn bsonAppendInt32(bson: *clib.bson_t, key: [:0]const u8, value: i32) !void {
+    if (!clib.bson_append_int32(bson, key, -1, value))
+        return BsonError.bsonError;
+}
+
+fn bsonAppendInt64(bson: *clib.bson_t, key: [:0]const u8, value: i64) !void {
+    if (!clib.bson_append_int64(bson, key, -1, value))
+        return BsonError.bsonError;
+}
+
+fn bsonAsCanonicalExtendedJson(bson: *const clib.bson_t) !Json {
+    var l: usize = undefined;
+
+    if (clib.bson_as_canonical_extended_json(bson, &l)) |json| {
+        return Json{
+            .ptr = json,
+        };
+    }
+
+    return BsonError.bsonError;
+}
+
+fn bsonHasField(bson: *const clib.bson_t, key: [:0]const u8) bool {
+    return clib.bson_has_field(bson, key);
+}
+
+fn bsonIter(bson: *const clib.bson_t) BsonError!Iter {
+    var it: clib.bson_iter_t = undefined;
+
+    if (clib.bson_iter_init(&it, bson)) {
+        return Iter{
+          .it = it,
+        };
+    }
+
+    return BsonError.bsonError;
+}
+
+fn BsonT(comptime T: type) type {
+    return struct {
+        //
+        // A little bit of Zig magic to make the namespaced functions
+        // usable both with a bson_t and *bson_t
+        //
+        const S = @This();
+        const is_ptr = switch(@typeInfo(T)) {
+            .Pointer => true,
+            else => false,
+        };
+
+        value: T,
+        fn get(self: *@This()) *clib.bson_t { return if (is_ptr) self.value else &self.value; }
+        fn getConst(self: *const @This()) *const clib.bson_t { return if (is_ptr) self.value else &self.value; }
+
+
+        usingnamespace if (is_ptr) struct {
+            pub fn new() !BsonPtr {
+                return bsonNew();
+            }
+        } else struct {
+            ///
+            /// Initialize a Bson document
+            ///
+            /// The document must be released by calling `.destroy()`
+            pub fn init(self: *Bson) void {
+                return bsonInit(self.get());
+            }
+        };
+
+
+        //
+        // Nmespaced functions. Forward to their raw counterparts.
+        // Hopefully this is inlined by the compiler.
+        //
+        pub fn destroy(self: *S) void {
+            return bsonDestroy(self.get());
+        }
+
+        pub fn appendUtf8(self: *S, key: [:0]const u8, value: [:0]const u8) !void {
+            return bsonAppendUtf8(self.get(), key, value);
+        }
+
+        pub fn appendInt32(self: *S, key: [:0]const u8, value: i32) !void {
+            return bsonAppendInt32(self.get(), key, value);
+        }
+
+        pub fn appendInt64(self: *S, key: [:0]const u8, value: i64) !void {
+            return bsonAppendInt64(self.get(), key, value);
+        }
+
+        pub fn asCanonicalExtendedJson(self: *const S) !Json {
+            return bsonAsCanonicalExtendedJson(self.getConst());
+        }
+
+        pub fn hasField(self: *const S, key: [:0]const u8) bool {
+            return bsonHasField(self.getConst(), key);
+        }
+
+        pub fn iter(self: *const S) BsonError!Iter {
+            return bsonIter(self.getConst());
+        }
+    };
+}
+
+pub const Bson = BsonT(clib.bson_t);
+pub const BsonPtr = BsonT(*clib.bson_t);
+
+//
+// }
