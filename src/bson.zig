@@ -223,38 +223,8 @@ fn bsonIter(bson: *const clib.bson_t) BsonError!Iter {
     return BsonError.bsonError;
 }
 
-fn BsonT(comptime T: type) type {
+fn BsonNamespacedFunctions(comptime S: type) type {
     return struct {
-        //
-        // A little bit of Zig magic to make the namespaced functions
-        // usable both with a bson_t and *bson_t
-        //
-        const S = @This();
-        const is_ptr = switch(@typeInfo(T)) {
-            .Pointer => true,
-            else => false,
-        };
-
-        value: T,
-        fn get(self: *@This()) *clib.bson_t { return if (is_ptr) self.value else &self.value; }
-        fn getConst(self: *const @This()) *const clib.bson_t { return if (is_ptr) self.value else &self.value; }
-
-
-        usingnamespace if (is_ptr) struct {
-            pub fn new() !BsonPtr {
-                return bsonNew();
-            }
-        } else struct {
-            ///
-            /// Initialize a Bson document
-            ///
-            /// The document must be released by calling `.destroy()`
-            pub fn init(self: *Bson) void {
-                return bsonInit(self.get());
-            }
-        };
-
-
         //
         // Nmespaced functions. Forward to their raw counterparts.
         // Hopefully this is inlined by the compiler.
@@ -289,8 +259,40 @@ fn BsonT(comptime T: type) type {
     };
 }
 
-pub const Bson = BsonT(clib.bson_t);
-pub const BsonPtr = BsonT(*clib.bson_t);
+pub const Bson = struct {
+    const S = @This();
 
-//
-// }
+    value: clib.bson_t,
+    fn get(self: *@This()) *clib.bson_t { return &self.value; }
+    fn getConst(self: *const @This()) *const clib.bson_t { return &self.value; }
+
+    ///
+    /// Initialize a Bson document
+    ///
+    /// The document must be released by calling `.destroy()`
+    pub fn init(self: *Bson) void {
+        return bsonInit(self.get());
+    }
+
+    usingnamespace BsonNamespacedFunctions(S);
+};
+
+pub const BsonPtr = struct {
+    const S = @This();
+
+    value: *clib.bson_t,
+    fn get(self: *@This()) *clib.bson_t { return self.value; }
+    fn getConst(self: *const @This()) *const clib.bson_t { return self.value; }
+
+    ///
+    /// Allocate a new bson_t on the heap.
+    /// Return a structure to access the newly allocated structure.
+    ///
+    /// The document must be released by calling `.destroy()`
+    pub fn new() !BsonPtr {
+        return bsonNew();
+    }
+
+    usingnamespace BsonNamespacedFunctions(S);
+};
+
